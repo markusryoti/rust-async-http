@@ -1,8 +1,9 @@
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, str::FromStr};
 
 use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::{TcpListener, TcpStream},
+    fs::File,
+    io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::{TcpListener, TcpStream, tcp::OwnedWriteHalf},
 };
 
 #[tokio::main]
@@ -26,7 +27,7 @@ async fn main() -> tokio::io::Result<()> {
 }
 
 async fn handle_connection(socket: TcpStream, addr: SocketAddr) -> tokio::io::Result<()> {
-    let (reader, mut writer) = socket.into_split();
+    let (reader, writer) = socket.into_split();
     let mut buffered_reader = BufReader::new(reader);
 
     let mut headers = Vec::new();
@@ -62,10 +63,64 @@ async fn handle_connection(socket: TcpStream, addr: SocketAddr) -> tokio::io::Re
         String::from_utf8_lossy(&body)
     );
 
-    let response = "HTTP/1.1 200 OK\r\n\r\n<h1>Ok thx</h1>";
+    let resource_row = headers.get(0).unwrap();
+    let rr = resource_row.parse::<ResourceRow>().unwrap();
 
-    writer.write_all(response.as_bytes()).await.unwrap();
-    writer.shutdown().await
+    router(writer, rr).await
+}
+
+fn get_headers() {}
+
+#[derive(Debug)]
+struct ResourceRow {
+    _method: String,
+    _protocol: String,
+    resource: String,
+}
+
+impl FromStr for ResourceRow {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.trim().split_whitespace().collect();
+
+        if parts.len() != 3 {
+            return Err("Invalid request line format");
+        }
+
+        Ok(ResourceRow {
+            _method: parts[0].to_string(),
+            resource: parts[1].to_string(),
+            _protocol: parts[2].to_string(),
+        })
+    }
+}
+
+async fn router(mut writer: OwnedWriteHalf, rr: ResourceRow) -> Result<(), std::io::Error> {
+    let res = match rr.resource.as_str() {
+        "/" => ("public/index.html", 200),
+        _ => ("public/404.html", 404),
+    };
+
+    let res = get_response(res.0, res.1).await?;
+
+    writer.write_all(&res.as_bytes()).await.unwrap();
+    writer.shutdown().await?;
+
+    Ok(())
+}
+
+async fn get_response(fname: &str, status: u16) -> Result<String, io::Error> {
+    let mut f = File::open(fname).await?;
+    let mut buffer = String::new();
+
+    f.read_to_string(&mut buffer).await?;
+
+    let length = buffer.len();
+
+    let response = format!("HTTP/1.1 {status}\r\nContent-Length: {length}\r\n\r\n{buffer}");
+
+    Ok(response)
 }
 
 fn handle_socket_error<T: Error>(e: T, addr: SocketAddr) {
