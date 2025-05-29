@@ -3,7 +3,10 @@ use std::{error::Error, net::SocketAddr, str::FromStr};
 use tokio::{
     fs::File,
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::{TcpListener, TcpStream, tcp::OwnedWriteHalf},
+    net::{
+        TcpListener, TcpStream,
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+    },
 };
 
 #[tokio::main]
@@ -30,11 +33,27 @@ async fn handle_connection(socket: TcpStream, addr: SocketAddr) -> tokio::io::Re
     let (reader, writer) = socket.into_split();
     let mut buffered_reader = BufReader::new(reader);
 
+    let headers = get_headers(&mut buffered_reader).await?;
+    let body = get_body(&mut buffered_reader, headers.content_length).await?;
+
+    println!(
+        "Request from {}:\nHeaders: {:#?}\nBody: {:?}",
+        addr,
+        headers.values,
+        String::from_utf8_lossy(&body)
+    );
+
+    let resource_row = headers.values.get(0).unwrap();
+    let rr = resource_row.parse::<ResourceRow>().unwrap();
+
+    router(writer, rr).await
+}
+
+async fn get_headers(buffered_reader: &mut BufReader<OwnedReadHalf>) -> Result<Headers, io::Error> {
     let mut headers = Vec::new();
     let mut content_length = 0;
     let mut line = String::new();
 
-    // Read headers
     loop {
         line.clear();
 
@@ -50,26 +69,28 @@ async fn handle_connection(socket: TcpStream, addr: SocketAddr) -> tokio::io::Re
         headers.push(line.trim_end().to_string());
     }
 
-    // Read body
+    Ok(Headers {
+        values: headers,
+        content_length: content_length,
+    })
+}
+
+struct Headers {
+    values: Vec<String>,
+    content_length: usize,
+}
+
+async fn get_body(
+    buffered_reader: &mut BufReader<OwnedReadHalf>,
+    content_length: usize,
+) -> Result<Vec<u8>, io::Error> {
     let mut body = vec![0u8; content_length];
     if content_length > 0 {
         buffered_reader.read_exact(&mut body).await?;
     }
 
-    println!(
-        "Request from {}:\nHeaders: {:#?}\nBody: {:?}",
-        addr,
-        headers,
-        String::from_utf8_lossy(&body)
-    );
-
-    let resource_row = headers.get(0).unwrap();
-    let rr = resource_row.parse::<ResourceRow>().unwrap();
-
-    router(writer, rr).await
+    Ok(body)
 }
-
-fn get_headers() {}
 
 #[derive(Debug)]
 struct ResourceRow {
