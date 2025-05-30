@@ -5,22 +5,26 @@ use std::{net::SocketAddr, usize};
 use tokio::net::TcpListener;
 use tokio::{io::BufReader, net::TcpStream};
 
-use crate::headers::request::HttpRequest;
-use crate::headers::{self, request};
+use crate::http::request::HttpRequest;
 use crate::routing::router;
 
 pub struct Server {
+    host: String,
     port: usize,
     router: router::Router,
 }
 
 impl Server {
-    pub fn new(router: router::Router, port: usize) -> Server {
-        Server { router, port }
+    pub fn new(router: router::Router, host: &str, port: usize) -> Server {
+        Server {
+            host: host.to_string(),
+            router,
+            port,
+        }
     }
 
     pub async fn start(self) -> std::io::Result<()> {
-        let srv_addr = format!("127.0.0.1:{}", self.port);
+        let srv_addr = format!("{}:{}", self.host, self.port);
         let listener = TcpListener::bind(&srv_addr).await?;
 
         let server = Arc::new(self);
