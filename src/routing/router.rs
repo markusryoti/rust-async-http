@@ -4,7 +4,7 @@ use tokio::{
     net::tcp::OwnedWriteHalf,
 };
 
-use crate::headers::request::{Headers, HttpFirstRow};
+use crate::headers::request::HttpRequest;
 
 pub struct Router {
     routes: Vec<Route>,
@@ -30,20 +30,16 @@ impl Router {
     pub async fn match_route(
         &self,
         mut writer: OwnedWriteHalf,
-        headers: Headers,
-        _body: Vec<u8>,
+        request: &HttpRequest,
     ) -> Result<(), std::io::Error> {
-        let resource_row = headers.values.get(0).unwrap();
-        let rr = resource_row.parse::<HttpFirstRow>().unwrap();
-
-        let res = self.routes.iter().find(|x| x.path == rr.resource);
+        let res = self.routes.iter().find(|x| x.path == request.path);
 
         let res = match res {
             Some(r) => (r.resource.clone(), 200),
             None => (String::from("public/404.html"), 404),
         };
 
-        let res = get_response(res.0.as_str(), res.1).await?;
+        let res = create_response(res.0.as_str(), res.1).await?;
 
         writer.write_all(&res.as_bytes()).await.unwrap();
         writer.shutdown().await?;
@@ -52,7 +48,7 @@ impl Router {
     }
 }
 
-async fn get_response(fname: &str, status: u16) -> Result<String, io::Error> {
+async fn create_response(fname: &str, status: u16) -> Result<String, io::Error> {
     let mut f = File::open(fname).await?;
     let mut buffer = String::new();
 

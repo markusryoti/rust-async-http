@@ -5,10 +5,9 @@ use std::{net::SocketAddr, usize};
 use tokio::net::TcpListener;
 use tokio::{io::BufReader, net::TcpStream};
 
-use crate::{
-    headers::request::{get_body, get_headers},
-    routing::router,
-};
+use crate::headers::request::HttpRequest;
+use crate::headers::{self, request};
+use crate::routing::router;
 
 pub struct Server {
     port: usize,
@@ -52,17 +51,19 @@ impl Server {
         let (reader, writer) = socket.into_split();
         let mut buffered_reader = BufReader::new(reader);
 
-        let headers = get_headers(&mut buffered_reader).await?;
-        let body = get_body(&mut buffered_reader, headers.content_length).await?;
+        let req = HttpRequest::parse(&mut buffered_reader).await?;
+
+        let body = match &req.body.as_ref() {
+            Some(b) => String::from_utf8_lossy(b),
+            None => String::from_utf8_lossy(b"no body"),
+        };
 
         println!(
             "Request from {}:\nHeaders: {:#?}\nBody: {:?}",
-            addr,
-            headers.values,
-            String::from_utf8_lossy(&body)
+            addr, req.headers, body,
         );
 
-        self.router.match_route(writer, headers, body).await
+        self.router.match_route(writer, &req).await
     }
 }
 
