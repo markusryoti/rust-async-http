@@ -60,3 +60,13 @@ async fn create_response(fname: &str, status: u16) -> Result<String, io::Error> 
 
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let router = Router::new();
+    }
+}
