@@ -1,5 +1,6 @@
 use routing::router::Router;
 use server::server::Server;
+use tokio::{fs::File, io::AsyncReadExt};
 
 pub mod http;
 pub mod routing;
@@ -9,13 +10,16 @@ pub mod server;
 async fn main() -> tokio::io::Result<()> {
     let mut router = Router::new();
 
-    let home_handler = async_handler!(|req, res| {
-        println!("Handling path: {}", req.path);
-        res.status = 200;
-        res.body = String::from("<h1>hello after fixing the macro <3</h1>");
+    let index_handler = async_handler!(|_req, res| {
+        let mut f = File::open("public/index.html").await.unwrap();
+        let mut buffer = String::new();
+
+        f.read_to_string(&mut buffer).await.unwrap();
+
+        res.body = buffer;
     });
 
-    router.add_route("/", home_handler);
+    router.add_route("/", index_handler);
 
     let server = Server::new(router, "127.0.0.1", 7878);
 

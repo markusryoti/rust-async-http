@@ -75,19 +75,6 @@ macro_rules! async_handler {
     }};
 }
 
-async fn create_response(fname: &str, status: u16) -> Result<String, io::Error> {
-    let mut f = File::open(fname).await?;
-    let mut buffer = String::new();
-
-    f.read_to_string(&mut buffer).await?;
-
-    let length = buffer.len();
-
-    let response = format!("HTTP/1.1 {status}\r\nContent-Length: {length}\r\n\r\n{buffer}");
-
-    Ok(response)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
