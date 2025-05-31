@@ -1,4 +1,4 @@
-use routing::router::{HandlerFn, Router};
+use routing::router::Router;
 use server::server::Server;
 
 pub mod http;
@@ -9,15 +9,10 @@ pub mod server;
 async fn main() -> tokio::io::Result<()> {
     let mut router = Router::new();
 
-    // router.add_route("/", "public/index.html");
-    // router.add_route("/kitty", "public/kitty.html");
-
-    let home_handler: HandlerFn = Box::new(|req, res| {
-        Box::pin(async move {
-            println!("Home handler received request for path: {}", req.path);
-            res.body = String::from("<h1>hello :)</h1>");
-            res.status = 200;
-        })
+    let home_handler = async_handler!(|req, res| {
+        println!("Handling path: {}", req.path);
+        res.status = 200;
+        res.body = String::from("<h1>hello after fixing the macro <3</h1>");
     });
 
     router.add_route("/", home_handler);

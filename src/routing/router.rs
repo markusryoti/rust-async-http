@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use tokio::{
     fs::File,
@@ -59,6 +59,22 @@ pub type HandlerFn = Box<
         + Sync,
 >;
 
+#[macro_export]
+macro_rules! async_handler {
+    (|$req:ident, $res:ident| $body:block) => {{
+        use std::{future::Future, pin::Pin};
+
+        fn handler<'a>(
+            $req: &'a $crate::http::request::HttpRequest,
+            $res: &'a mut $crate::http::response::HttpResponse,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+            Box::pin(async move $body)
+        }
+
+        Box::new(handler) as $crate::routing::router::HandlerFn
+    }};
+}
+
 async fn create_response(fname: &str, status: u16) -> Result<String, io::Error> {
     let mut f = File::open(fname).await?;
     let mut buffer = String::new();
@@ -80,37 +96,20 @@ mod tests {
     fn function_works() {
         let mut router = Router::new();
 
-        // let home_handler: HandlerFn = Box::new(|req, res| {
-        //     Box::pin(async move {
-        //         println!("Home handler received request for path: {}", req.path);
-        //         res.status = 200;
-        //     })
-        // });
+        async fn handler(_req: &HttpRequest, res: &mut HttpResponse) {}
 
-        let home_handler: HandlerFn = Box::new(|req, res| {
-            Box::pin(async move {
-                println!("Home handler received request for path: {}", req.path);
-                res.status = 200;
-            })
-        });
-
-        // async fn home_handler(req: &HttpRequest, res: &mut HttpResponse) {
-        //     println!("Home handler received request for path: {}", req.path);
-        //     res.status = 200;
-        // }
-
-        router.add_route("/", home_handler);
+        // router.add_route("/", handler);
     }
 
     #[test]
     fn closure_works() {
-        // let mut router = Router::new();
+        let mut router = Router::new();
 
-        // router.add_route("/about", |req, res| {
-        //     Box::pin(async move {
-        //         println!("About handler received request for path: {}", req.path);
-        //         res.status = 200;
-        //     })
-        // });
+        let handler: HandlerFn = async_handler!(|_req, res| {
+            res.status = 200;
+            res.body = String::from("hello");
+        });
+
+        router.add_route("/", handler);
     }
 }
