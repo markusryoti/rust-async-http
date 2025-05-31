@@ -1,10 +1,5 @@
-use std::{collections::HashMap, pin::Pin, sync::Arc};
-
-use tokio::{
-    fs::File,
-    io::{self, AsyncReadExt, AsyncWriteExt},
-    net::tcp::OwnedWriteHalf,
-};
+use std::{collections::HashMap, pin::Pin};
+use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf};
 
 use crate::http::{request::HttpRequest, response::HttpResponse};
 
@@ -75,6 +70,11 @@ macro_rules! async_handler {
     }};
 }
 
+#[macro_export]
+macro_rules! wrap_async_handler {
+    ($func:path) => {{ $crate::async_handler!(|req, res| { $func(req, res).await }) }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,9 +83,12 @@ mod tests {
     fn function_works() {
         let mut router = Router::new();
 
-        async fn handler(_req: &HttpRequest, res: &mut HttpResponse) {}
+        async fn _handler(_req: &HttpRequest, res: &mut HttpResponse) {
+            res.status = 200;
+            res.body = String::from("hello");
+        }
 
-        // router.add_route("/", handler);
+        router.add_route("/", wrap_async_handler!(_handler));
     }
 
     #[test]
