@@ -1,30 +1,26 @@
+use std::{collections::HashMap, pin::Pin};
+
 use tokio::{
     fs::File,
     io::{self, AsyncReadExt, AsyncWriteExt},
     net::tcp::OwnedWriteHalf,
 };
 
-use crate::http::request::HttpRequest;
+use crate::http::{request::HttpRequest, response::HttpResponse};
 
 pub struct Router {
-    routes: Vec<Route>,
-}
-
-pub struct Route {
-    path: String,
-    resource: String,
+    routes: HashMap<String, HandlerFn>,
 }
 
 impl Router {
     pub fn new() -> Router {
-        Router { routes: vec![] }
+        Router {
+            routes: HashMap::new(),
+        }
     }
 
-    pub fn add_route(&mut self, uri_path: &str, resource: &str) {
-        self.routes.push(Route {
-            path: String::from(uri_path),
-            resource: String::from(resource),
-        });
+    pub fn add_route(&mut self, path: &str, handler: HandlerFn) {
+        self.routes.insert(path.to_string(), handler);
     }
 
     pub async fn match_route(
@@ -32,21 +28,36 @@ impl Router {
         mut writer: OwnedWriteHalf,
         request: &HttpRequest,
     ) -> Result<(), std::io::Error> {
-        let res = self.routes.iter().find(|x| x.path == request.path);
+        let route = self.routes.get(&request.path);
 
-        let res = match res {
-            Some(r) => (r.resource.clone(), 200),
-            None => (String::from("public/404.html"), 404),
-        };
+        let mut res = HttpResponse::new();
 
-        let res = create_response(res.0.as_str(), res.1).await?;
+        if let Some(r) = route {
+            r(request, &mut res).await;
+        }
 
-        writer.write_all(&res.as_bytes()).await.unwrap();
+        let response = format!(
+            "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
+            res.status,
+            res.body.len(),
+            res.body
+        );
+
+        writer.write_all(response.as_bytes()).await.unwrap();
         writer.shutdown().await?;
 
         Ok(())
     }
 }
+
+pub type HandlerFn = Box<
+    dyn for<'a> Fn(
+            &'a HttpRequest,
+            &'a mut HttpResponse,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>
+        + Send
+        + Sync,
+>;
 
 async fn create_response(fname: &str, status: u16) -> Result<String, io::Error> {
     let mut f = File::open(fname).await?;
@@ -66,7 +77,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let router = Router::new();
+    fn function_works() {
+        let mut router = Router::new();
+
+        // let home_handler: HandlerFn = Box::new(|req, res| {
+        //     Box::pin(async move {
+        //         println!("Home handler received request for path: {}", req.path);
+        //         res.status = 200;
+        //     })
+        // });
+
+        let home_handler: HandlerFn = Box::new(|req, res| {
+            Box::pin(async move {
+                println!("Home handler received request for path: {}", req.path);
+                res.status = 200;
+            })
+        });
+
+        // async fn home_handler(req: &HttpRequest, res: &mut HttpResponse) {
+        //     println!("Home handler received request for path: {}", req.path);
+        //     res.status = 200;
+        // }
+
+        router.add_route("/", home_handler);
+    }
+
+    #[test]
+    fn closure_works() {
+        // let mut router = Router::new();
+
+        // router.add_route("/about", |req, res| {
+        //     Box::pin(async move {
+        //         println!("About handler received request for path: {}", req.path);
+        //         res.status = 200;
+        //     })
+        // });
     }
 }
