@@ -1,7 +1,15 @@
 use std::{collections::HashMap, pin::Pin};
-use tokio::{io::AsyncWriteExt, net::tcp::OwnedWriteHalf};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::tcp::OwnedWriteHalf,
+};
 
-use crate::http::{request::HttpRequest, response::HttpResponse};
+use crate::http::{
+    headers::{HttpHeaderName, HttpHeaderValue},
+    request::HttpRequest,
+    response::HttpResponse,
+};
 
 pub struct Router {
     routes: HashMap<String, HandlerFn>,
@@ -29,13 +37,34 @@ impl Router {
 
         if let Some(r) = route {
             r(request, &mut res).await;
+        } else {
+            not_found(&mut res).await;
         }
 
+        // TODO:
+        // Make sure all "needed" headers are included
+        res.add_header(
+            HttpHeaderName::ContentLength,
+            &res.content_length().to_string(),
+        );
+
+        let header_string = res
+            .headers
+            .values
+            .iter()
+            .map(|(key, value)| {
+                format!(
+                    "{}:{}",
+                    key.as_str(),
+                    HttpHeaderValue::as_str(value.first().unwrap())
+                )
+            })
+            .collect::<Vec<String>>()
+            .join("\r\n");
+
         let response = format!(
-            "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
-            res.status,
-            res.body.len(),
-            res.body
+            "HTTP/1.1 {}\r\n{}\r\n\r\n{}",
+            res.status_code, header_string, res.body
         );
 
         writer.write_all(response.as_bytes()).await.unwrap();
@@ -43,6 +72,16 @@ impl Router {
 
         Ok(())
     }
+}
+
+async fn not_found(res: &mut HttpResponse) {
+    let mut f = File::open("public/404.html").await.unwrap();
+    let mut buffer = String::new();
+
+    f.read_to_string(&mut buffer).await.unwrap();
+
+    res.body = buffer;
+    res.status_code = 404;
 }
 
 pub type HandlerFn = Box<
@@ -71,7 +110,7 @@ macro_rules! async_handler {
 }
 
 #[macro_export]
-macro_rules! wrap_async_handler {
+macro_rules! async_fn_handler {
     ($func:path) => {{ $crate::async_handler!(|req, res| { $func(req, res).await }) }};
 }
 
@@ -84,11 +123,11 @@ mod tests {
         let mut router = Router::new();
 
         async fn _handler(_req: &HttpRequest, res: &mut HttpResponse) {
-            res.status = 200;
+            res.status_code = 200;
             res.body = String::from("hello");
         }
 
-        router.add_route("/", wrap_async_handler!(_handler));
+        router.add_route("/", async_fn_handler!(_handler));
     }
 
     #[test]
@@ -96,7 +135,7 @@ mod tests {
         let mut router = Router::new();
 
         let handler: HandlerFn = async_handler!(|_req, res| {
-            res.status = 200;
+            res.status_code = 200;
             res.body = String::from("hello");
         });
 

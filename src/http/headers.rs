@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum HttpHeaderName {
-    // ... (All your HttpHeaderName variants)
     CacheControl,
     Connection,
     Date,
@@ -106,9 +105,63 @@ impl From<&str> for HttpHeaderName {
     }
 }
 
+impl HttpHeaderName {
+    // Helper method to get the string representation
+    pub fn as_str(&self) -> &str {
+        match self {
+            HttpHeaderName::CacheControl => "Cache-Control",
+            HttpHeaderName::Connection => "Connection",
+            HttpHeaderName::Date => "Date",
+            HttpHeaderName::Pragma => "Pragma",
+            HttpHeaderName::Trailer => "Trailer",
+            HttpHeaderName::TransferEncoding => "Transfer-Encoding",
+            HttpHeaderName::Upgrade => "Upgrade",
+            HttpHeaderName::Via => "Via",
+            HttpHeaderName::Warning => "Warning",
+            HttpHeaderName::Accept => "Accept",
+            HttpHeaderName::AcceptCharset => "Accept-Charset",
+            HttpHeaderName::AcceptEncoding => "Accept-Encoding",
+            HttpHeaderName::AcceptLanguage => "Accept-Language",
+            HttpHeaderName::Authorization => "Authorization",
+            HttpHeaderName::Cookie => "Cookie",
+            HttpHeaderName::ContentLength => "Content-Length",
+            HttpHeaderName::ContentType => "Content-Type",
+            HttpHeaderName::Expect => "Expect",
+            HttpHeaderName::From => "From",
+            HttpHeaderName::Host => "Host",
+            HttpHeaderName::IfMatch => "If-Match",
+            HttpHeaderName::IfModifiedSince => "If-Modified-Since",
+            HttpHeaderName::IfNoneMatch => "If-None-Match",
+            HttpHeaderName::IfRange => "If-Range",
+            HttpHeaderName::IfUnmodifiedSince => "If-Unmodified-Since",
+            HttpHeaderName::MaxForwards => "Max-Forwards",
+            HttpHeaderName::ProxyAuthorization => "Proxy-Authorization",
+            HttpHeaderName::Range => "Range",
+            HttpHeaderName::Referer => "Referer",
+            HttpHeaderName::TE => "TE",
+            HttpHeaderName::UserAgent => "User-Agent",
+            HttpHeaderName::Age => "Age",
+            HttpHeaderName::Allow => "Allow",
+            HttpHeaderName::ContentEncoding => "Content-Encoding",
+            HttpHeaderName::ContentLanguage => "Content-Language",
+            HttpHeaderName::ContentLocation => "Content-Location",
+            HttpHeaderName::ContentMD5 => "Content-MD5",
+            HttpHeaderName::ContentRange => "Content-Range",
+            HttpHeaderName::Expires => "Expires",
+            HttpHeaderName::LastModified => "Last-Modified",
+            HttpHeaderName::Location => "Location",
+            HttpHeaderName::ProxyAuthenticate => "Proxy-Authenticate",
+            HttpHeaderName::RetryAfter => "Retry-After",
+            HttpHeaderName::Server => "Server",
+            HttpHeaderName::Vary => "Vary",
+            HttpHeaderName::WWWAuthenticate => "WWW-Authenticate",
+            HttpHeaderName::Custom(s) => s.as_str(), // For custom headers, use the inner string
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum HttpHeaderValue {
-    // ... (All your HttpHeaderValue variants)
     ContentLength(usize),
     ContentType(String),
     Host(String, Option<u16>),
@@ -118,7 +171,6 @@ pub enum HttpHeaderValue {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ConnectionHeaderValue {
-    // ... (All your ConnectionHeaderValue variants)
     Close,
     KeepAlive,
     Upgrade,
@@ -151,31 +203,37 @@ impl HttpHeaderValue {
             _ => HttpHeaderValue::Raw(value.to_string()),
         }
     }
+
+    pub fn as_str(value: &HttpHeaderValue) -> String {
+        match value {
+            HttpHeaderValue::ContentLength(cl) => cl.to_string(),
+            HttpHeaderValue::ContentType(ct) => ct.clone(),
+            HttpHeaderValue::Host(a, p) => format!("{}:{}", a, p.unwrap_or(80).to_string()),
+            HttpHeaderValue::Connection(_connection_header_value) => todo!(),
+            HttpHeaderValue::Raw(_) => todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct HttpHeaders {
-    pub headers: HashMap<HttpHeaderName, Vec<HttpHeaderValue>>,
+    pub values: HashMap<HttpHeaderName, Vec<HttpHeaderValue>>,
 }
 
 impl HttpHeaders {
     pub fn new() -> Self {
         HttpHeaders {
-            headers: HashMap::new(),
+            values: HashMap::new(),
         }
     }
 
-    pub fn add(&mut self, name_str: &str, value_str: &str) {
-        let name: HttpHeaderName = name_str.into();
+    pub fn add(&mut self, name: HttpHeaderName, value_str: &str) {
         let value = HttpHeaderValue::parse(&name, value_str);
-        self.headers
-            .entry(name)
-            .or_insert_with(Vec::new)
-            .push(value);
+        self.values.entry(name).or_insert_with(Vec::new).push(value);
     }
 
     pub fn get(&self, name: &HttpHeaderName) -> Option<&Vec<HttpHeaderValue>> {
-        self.headers.get(name)
+        self.values.get(name)
     }
 
     pub fn get_one_raw(&self, name: &HttpHeaderName) -> Option<&str> {

@@ -5,7 +5,10 @@ use tokio::{
     net::tcp::OwnedReadHalf,
 };
 
-use super::{headers::HttpHeaders, method::HttpMethod};
+use super::{
+    headers::{HttpHeaderName, HttpHeaders},
+    method::HttpMethod,
+};
 
 #[derive(Debug)]
 pub struct HttpFirstRow {
@@ -83,7 +86,9 @@ impl HttpRequest {
             let key = parts.next().unwrap().trim();
             let value = parts.next().unwrap().trim();
 
-            headers.add(key, value);
+            let header = HttpHeaderName::from(key);
+
+            headers.add(header, value);
         }
 
         let content_length = headers.content_length().unwrap_or(0);
