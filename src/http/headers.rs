@@ -208,7 +208,9 @@ impl HttpHeaderValue {
             HttpHeaderValue::ContentLength(cl) => cl.to_string(),
             HttpHeaderValue::ContentType(ct) => ct.clone(),
             HttpHeaderValue::Host(a, p) => format!("{}:{}", a, p.unwrap_or(80).to_string()),
-            HttpHeaderValue::Connection(_connection_header_value) => todo!(),
+            HttpHeaderValue::Connection(connection_header_value) => {
+                connection_header_value.as_str()
+            }
             HttpHeaderValue::Raw(s) => s.clone(),
         }
     }
@@ -217,9 +219,9 @@ impl HttpHeaderValue {
 impl ConnectionHeaderValue {
     pub fn as_str(&self) -> String {
         match self {
-            ConnectionHeaderValue::Close => "Close".to_string(),
-            ConnectionHeaderValue::KeepAlive => "Keep-Alive".to_string(),
-            ConnectionHeaderValue::Upgrade => "Upgrade".to_string(),
+            ConnectionHeaderValue::Close => "close".to_string(),
+            ConnectionHeaderValue::KeepAlive => "keep-alive".to_string(),
+            ConnectionHeaderValue::Upgrade => "upgrade".to_string(),
             ConnectionHeaderValue::Custom(s) => s.clone(),
         }
     }
@@ -277,6 +279,20 @@ impl HttpHeaders {
                     None
                 }
             })
+    }
+
+    pub fn as_str(&self) -> String {
+        let header_string = self
+            .values
+            .iter()
+            .map(|(key, value)| {
+                let header_value = value.first().map_or("".to_string(), |v| v.as_str());
+                format!("{}: {}", key.as_str(), header_value)
+            })
+            .collect::<Vec<String>>()
+            .join("\r\n");
+
+        header_string
     }
 
     pub fn host(&self) -> Option<(&str, Option<u16>)> {

@@ -1,6 +1,6 @@
 use std::error::Error;
+use std::net::SocketAddr;
 use std::sync::Arc;
-use std::{net::SocketAddr, usize};
 
 use log::{error, info};
 use tokio::net::TcpListener;
@@ -11,12 +11,12 @@ use crate::routing::router;
 
 pub struct Server {
     host: String,
-    port: usize,
+    port: u16,
     router: router::Router,
 }
 
 impl Server {
-    pub fn new(router: router::Router, host: &str, port: usize) -> Server {
+    pub fn new(router: router::Router, host: &str, port: u16) -> Server {
         Server {
             host: host.to_string(),
             router,
@@ -29,15 +29,14 @@ impl Server {
         let listener = TcpListener::bind(&srv_addr).await?;
 
         let server = Arc::new(self);
-        let listener = Arc::new(listener);
 
         info!("Async server listening on {srv_addr}");
 
         loop {
-            let listener = Arc::clone(&listener);
             let server = Arc::clone(&server);
 
             let (socket, addr) = listener.accept().await?;
+
             info!("New connection from {addr}");
 
             tokio::spawn(async move {
@@ -59,8 +58,8 @@ impl Server {
         let req = HttpRequest::parse(&mut buffered_reader).await?;
 
         let body = match &req.body.as_ref() {
-            Some(b) => String::from_utf8_lossy(b),
-            None => String::from_utf8_lossy(b"no body"),
+            Some(b) => String::from_utf8_lossy(b).to_string(),
+            None => "no body".to_string(),
         };
 
         info!(

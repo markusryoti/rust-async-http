@@ -47,18 +47,13 @@ impl Router {
             HttpHeaderName::ContentLength,
             &res.content_length().to_string(),
         );
-
-        let header_string = res
-            .headers
-            .values
-            .iter()
-            .map(|(key, value)| format!("{}:{}", key.as_str(), value.first().unwrap().as_str()))
-            .collect::<Vec<String>>()
-            .join("\r\n");
+        res.add_header(HttpHeaderName::Connection, "close");
 
         let response = format!(
             "HTTP/1.1 {}\r\n{}\r\n\r\n{}",
-            res.status_code, header_string, res.body
+            res.status_code,
+            res.headers.as_str(),
+            res.body
         );
 
         info!(
@@ -69,8 +64,10 @@ impl Router {
             res.headers.content_type().unwrap_or("text/html")
         );
 
-        writer.write_all(response.as_bytes()).await.unwrap();
-        writer.shutdown().await?;
+        writer.write_all(response.as_bytes()).await?;
+        writer.flush().await?;
+
+        info!("Response sent to peer: {}", addr);
 
         Ok(())
     }

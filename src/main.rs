@@ -36,6 +36,8 @@ async fn main() -> tokio::io::Result<()> {
 
     server.start().await?;
 
+    info!("Server shutting down");
+
     Ok(())
 }
 
