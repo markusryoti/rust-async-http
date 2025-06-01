@@ -17,7 +17,13 @@ impl From<&str> for HttpMethod {
         match s.to_ascii_uppercase().as_str() {
             "GET" => HttpMethod::GET,
             "HEAD" => HttpMethod::HEAD,
-            // ...
+            "POST" => HttpMethod::POST,
+            "PUT" => HttpMethod::PUT,
+            "DELETE" => HttpMethod::DELETE,
+            "CONNECT" => HttpMethod::CONNECT,
+            "OPTIONS" => HttpMethod::OPTIONS,
+            "TRACE" => HttpMethod::TRACE,
+            "PATCH" => HttpMethod::PATCH,
             _ => HttpMethod::Custom(s.to_string()),
         }
     }

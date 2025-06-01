@@ -2,6 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 use std::{net::SocketAddr, usize};
 
+use log::{error, info};
 use tokio::net::TcpListener;
 use tokio::{io::BufReader, net::TcpStream};
 
@@ -30,14 +31,14 @@ impl Server {
         let server = Arc::new(self);
         let listener = Arc::new(listener);
 
-        println!("Async server listening on {srv_addr}");
+        info!("Async server listening on {srv_addr}");
 
         loop {
             let listener = Arc::clone(&listener);
             let server = Arc::clone(&server);
 
             let (socket, addr) = listener.accept().await?;
-            println!("New connection from {addr}");
+            info!("New connection from {addr}");
 
             tokio::spawn(async move {
                 if let Err(e) = server.handle_connection(socket, addr).await {
@@ -62,15 +63,17 @@ impl Server {
             None => String::from_utf8_lossy(b"no body"),
         };
 
-        println!(
-            "Request from {}:\nHeaders: {:#?}\nBody: {:?}",
-            addr, req.headers, body,
+        info!(
+            "Handling request from {}, NumHeaders: {}, Body: {:#?}",
+            addr,
+            req.headers.values.len(),
+            body,
         );
 
-        self.router.match_route(writer, &req).await
+        self.router.match_route(writer, addr, &req).await
     }
 }
 
 fn handle_socket_error<T: Error>(e: T, addr: SocketAddr) {
-    eprintln!("Error handling {}: {}", addr, e);
+    error!("Error handling {}: {}", addr, e);
 }

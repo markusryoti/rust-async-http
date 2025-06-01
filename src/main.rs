@@ -8,8 +8,12 @@ pub mod http;
 pub mod routing;
 pub mod server;
 
+use log::{Level, info};
+
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
+    simple_logger::init_with_level(Level::Info).unwrap();
+
     let mut router = Router::new();
 
     let index_handler = async_handler!(|_req, res| {
@@ -18,6 +22,7 @@ async fn main() -> tokio::io::Result<()> {
 
         f.read_to_string(&mut buffer).await.unwrap();
 
+        res.add_header(HttpHeaderName::from("Content-Type"), "text/html");
         res.body = buffer;
     });
 
@@ -26,6 +31,8 @@ async fn main() -> tokio::io::Result<()> {
     router.add_route("/json", async_fn_handler!(json_handler));
 
     let server = Server::new(router, "127.0.0.1", 7878);
+
+    info!("Starting server");
 
     server.start().await?;
 
@@ -37,6 +44,8 @@ async fn kitty_handler(_req: &HttpRequest, res: &mut HttpResponse) {
     let mut buffer = String::new();
 
     f.read_to_string(&mut buffer).await.unwrap();
+
+    res.add_header(HttpHeaderName::from("Content-Type"), "text/html");
 
     res.body = buffer;
 }

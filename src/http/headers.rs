@@ -106,7 +106,6 @@ impl From<&str> for HttpHeaderName {
 }
 
 impl HttpHeaderName {
-    // Helper method to get the string representation
     pub fn as_str(&self) -> &str {
         match self {
             HttpHeaderName::CacheControl => "Cache-Control",
@@ -155,7 +154,7 @@ impl HttpHeaderName {
             HttpHeaderName::Server => "Server",
             HttpHeaderName::Vary => "Vary",
             HttpHeaderName::WWWAuthenticate => "WWW-Authenticate",
-            HttpHeaderName::Custom(s) => s.as_str(), // For custom headers, use the inner string
+            HttpHeaderName::Custom(s) => s.as_str(),
         }
     }
 }
@@ -204,13 +203,24 @@ impl HttpHeaderValue {
         }
     }
 
-    pub fn as_str(value: &HttpHeaderValue) -> String {
-        match value {
+    pub fn as_str(&self) -> String {
+        match self {
             HttpHeaderValue::ContentLength(cl) => cl.to_string(),
             HttpHeaderValue::ContentType(ct) => ct.clone(),
             HttpHeaderValue::Host(a, p) => format!("{}:{}", a, p.unwrap_or(80).to_string()),
             HttpHeaderValue::Connection(_connection_header_value) => todo!(),
-            HttpHeaderValue::Raw(_) => todo!(),
+            HttpHeaderValue::Raw(s) => s.clone(),
+        }
+    }
+}
+
+impl ConnectionHeaderValue {
+    pub fn as_str(&self) -> String {
+        match self {
+            ConnectionHeaderValue::Close => "Close".to_string(),
+            ConnectionHeaderValue::KeepAlive => "Keep-Alive".to_string(),
+            ConnectionHeaderValue::Upgrade => "Upgrade".to_string(),
+            ConnectionHeaderValue::Custom(s) => s.clone(),
         }
     }
 }
@@ -251,6 +261,18 @@ impl HttpHeaders {
             .and_then(|value| {
                 if let HttpHeaderValue::ContentLength(len) = value {
                     Some(*len)
+                } else {
+                    None
+                }
+            })
+    }
+
+    pub fn content_type(&self) -> Option<&str> {
+        self.get(&HttpHeaderName::ContentType)
+            .and_then(|values| values.first())
+            .and_then(|value| {
+                if let HttpHeaderValue::ContentType(t) = value {
+                    Some(t.as_str())
                 } else {
                     None
                 }

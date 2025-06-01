@@ -1,15 +1,12 @@
-use std::{collections::HashMap, pin::Pin};
+use log::info;
+use std::{collections::HashMap, net::SocketAddr, pin::Pin};
 use tokio::{
     fs::File,
     io::{AsyncReadExt, AsyncWriteExt},
     net::tcp::OwnedWriteHalf,
 };
 
-use crate::http::{
-    headers::{HttpHeaderName, HttpHeaderValue},
-    request::HttpRequest,
-    response::HttpResponse,
-};
+use crate::http::{headers::HttpHeaderName, request::HttpRequest, response::HttpResponse};
 
 pub struct Router {
     routes: HashMap<String, HandlerFn>,
@@ -29,8 +26,11 @@ impl Router {
     pub async fn match_route(
         &self,
         mut writer: OwnedWriteHalf,
+        addr: SocketAddr,
         request: &HttpRequest,
     ) -> Result<(), std::io::Error> {
+        info!("Handling request to path: {}", request.path);
+
         let route = self.routes.get(&request.path);
 
         let mut res = HttpResponse::new();
@@ -52,19 +52,21 @@ impl Router {
             .headers
             .values
             .iter()
-            .map(|(key, value)| {
-                format!(
-                    "{}:{}",
-                    key.as_str(),
-                    HttpHeaderValue::as_str(value.first().unwrap())
-                )
-            })
+            .map(|(key, value)| format!("{}:{}", key.as_str(), value.first().unwrap().as_str()))
             .collect::<Vec<String>>()
             .join("\r\n");
 
         let response = format!(
             "HTTP/1.1 {}\r\n{}\r\n\r\n{}",
             res.status_code, header_string, res.body
+        );
+
+        info!(
+            "Sending response to peer: {} with status: {}, Content-Length: {}, Content-Type: {}",
+            addr,
+            res.status_code,
+            res.content_length(),
+            res.headers.content_type().unwrap_or("text/html")
         );
 
         writer.write_all(response.as_bytes()).await.unwrap();
