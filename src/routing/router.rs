@@ -25,9 +25,10 @@ impl Router {
 
     pub async fn match_route(
         &self,
-        mut writer: OwnedWriteHalf,
+        writer: &mut OwnedWriteHalf,
         addr: SocketAddr,
         request: &HttpRequest,
+        keep_alive: bool,
     ) -> Result<(), std::io::Error> {
         info!("Handling request to path: {}", request.path);
 
@@ -47,7 +48,13 @@ impl Router {
             HttpHeaderName::ContentLength,
             &res.content_length().to_string(),
         );
-        res.add_header(HttpHeaderName::Connection, "close");
+
+        if keep_alive {
+            res.add_header(HttpHeaderName::Connection, "Keep-Alive");
+            res.add_header(HttpHeaderName::KeepAlive, "timeout=5, max=200");
+        } else {
+            res.add_header(HttpHeaderName::Connection, "Close");
+        }
 
         let response = format!(
             "HTTP/1.1 {}\r\n{}\r\n\r\n{}",
@@ -65,7 +72,7 @@ impl Router {
         );
 
         writer.write_all(response.as_bytes()).await?;
-        writer.flush().await?;
+        // writer.flush().await?;
 
         info!("Response sent to peer: {}", addr);
 
