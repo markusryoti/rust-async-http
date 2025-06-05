@@ -76,7 +76,6 @@ impl Server {
             };
 
             let keep_alive = should_keep_alive(&req.headers);
-            // let keep_alive = false;
 
             info!(
                 "Handling request from {}, NumHeaders: {}, LenBody: {}",
@@ -106,18 +105,26 @@ fn should_keep_alive(headers: &HttpHeaders) -> bool {
     if let Some(ch) = connection_header {
         let res = ch.get(0);
         let header_value = match res {
-            None => return false,
+            None => {
+                error!("Found connection header but now value. Don't use keep-alive");
+                return false;
+            }
             Some(hv) => hv,
         };
 
         if let HttpHeaderValue::Connection(cv) = header_value {
+            if let ConnectionHeaderValue::Close = cv {
+                info!("Client requested connection close");
+                return false;
+            }
             if let ConnectionHeaderValue::KeepAlive = cv {
+                info!("Client requested keep alive");
                 return true;
             }
         }
     }
-
-    false
+    info!("No connection header, defaulting to keep-alive (HTTP/1.1)");
+    return true;
 }
 
 fn handle_socket_error<T: Error>(e: T, addr: SocketAddr) {

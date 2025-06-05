@@ -51,7 +51,7 @@ impl Router {
 
         if keep_alive {
             res.add_header(HttpHeaderName::Connection, "Keep-Alive");
-            res.add_header(HttpHeaderName::KeepAlive, "timeout=5, max=200");
+            res.add_header(HttpHeaderName::KeepAlive, "timeout=15, max=100");
         } else {
             res.add_header(HttpHeaderName::Connection, "Close");
         }
