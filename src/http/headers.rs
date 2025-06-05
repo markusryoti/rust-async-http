@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub enum HttpHeaderName {
     CacheControl,
     Connection,
+    KeepAlive,
     Date,
     Pragma,
     Trailer,
@@ -56,6 +57,7 @@ impl From<&str> for HttpHeaderName {
         match s.to_ascii_lowercase().as_str() {
             "cache-control" => HttpHeaderName::CacheControl,
             "connection" => HttpHeaderName::Connection,
+            "keep-alive" => HttpHeaderName::KeepAlive,
             "date" => HttpHeaderName::Date,
             "pragma" => HttpHeaderName::Pragma,
             "trailer" => HttpHeaderName::Trailer,
@@ -110,6 +112,7 @@ impl HttpHeaderName {
         match self {
             HttpHeaderName::CacheControl => "Cache-Control",
             HttpHeaderName::Connection => "Connection",
+            HttpHeaderName::KeepAlive => "Keep-Alive",
             HttpHeaderName::Date => "Date",
             HttpHeaderName::Pragma => "Pragma",
             HttpHeaderName::Trailer => "Trailer",
