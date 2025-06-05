@@ -8,6 +8,7 @@ use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tokio::{io::BufReader, net::TcpStream};
 
+use crate::Args;
 use crate::http::headers::{ConnectionHeaderValue, HttpHeaderName, HttpHeaderValue, HttpHeaders};
 use crate::http::request::HttpRequest;
 use crate::routing::router;
@@ -16,14 +17,16 @@ pub struct Server {
     host: String,
     port: u16,
     router: router::Router,
+    features: Args,
 }
 
 impl Server {
-    pub fn new(router: router::Router, host: &str, port: u16) -> Server {
+    pub fn new(router: router::Router, host: &str, port: u16, features: Args) -> Server {
         Server {
             host: host.to_string(),
             router,
             port,
+            features,
         }
     }
 
@@ -75,7 +78,12 @@ impl Server {
                 None => "no body".to_string(),
             };
 
-            let keep_alive = should_keep_alive(&req.headers);
+            let keep_alive = if self.features.use_keep_alive {
+                should_use_keep_alive(&req.headers)
+            } else {
+                info!("No keep-alive feature used, skpping");
+                false
+            };
 
             info!(
                 "Handling request from {}, NumHeaders: {}, LenBody: {}",
@@ -89,18 +97,18 @@ impl Server {
                 .await?;
 
             if !keep_alive {
-                info!("No keep-alive, exiting");
+                info!("No keep-alive configured, exiting");
                 break;
             }
 
-            info!("Keep-alive, continuing");
+            info!("Keep-alive configured, continuing with connection");
         }
 
         Ok(())
     }
 }
 
-fn should_keep_alive(headers: &HttpHeaders) -> bool {
+fn should_use_keep_alive(headers: &HttpHeaders) -> bool {
     let connection_header = headers.get(&HttpHeaderName::Connection);
     if let Some(ch) = connection_header {
         let res = ch.get(0);

@@ -1,3 +1,4 @@
+use clap::{Parser, command};
 use http::{headers::HttpHeaderName, request::HttpRequest, response::HttpResponse};
 use routing::router::Router;
 use serde::{Deserialize, Serialize};
@@ -10,9 +11,22 @@ pub mod server;
 
 use log::{Level, info};
 
+/// Rust async TCP/HTTP server
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct Args {
+    // Use keep alive or force the connection to close
+    #[arg(short, long)]
+    use_keep_alive: bool,
+}
+
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
     simple_logger::init_with_level(Level::Info).unwrap();
+
+    let features = Args::parse();
+
+    println!("Using features: {:?}", features);
 
     let mut router = Router::new();
 
@@ -30,7 +44,7 @@ async fn main() -> tokio::io::Result<()> {
     router.add_route("/kitty", async_fn_handler!(kitty_handler));
     router.add_route("/json", async_fn_handler!(json_handler));
 
-    let server = Server::new(router, "127.0.0.1", 7878);
+    let server = Server::new(router, "127.0.0.1", 7878, features);
 
     info!("Starting server");
 
